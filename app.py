@@ -8,5 +8,5 @@ def webhook():
     print("Recebido:", data)
     return "OK", 200
 
-if _name_ == '__main__':
+if __name__ == '__main__':
     app.run()
