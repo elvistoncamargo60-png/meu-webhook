@@ -1,6 +1,6 @@
 from flask import Flask, request
 
-app = Flask(_name_)
+app = Flask(__name__)
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
@@ -8,5 +8,5 @@ def webhook():
     print("Recebido:", data)
     return "OK", 200
 
-if _name_ == '_main_':
+if _name_ == '__main__':
     app.run()
