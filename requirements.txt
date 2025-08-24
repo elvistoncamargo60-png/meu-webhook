@@ -1,0 +1,11 @@
+flask
+gunicorn
+requests
+pandas
+telegram
+instabot
+selenium
+opencv-python
+pillow
+moviepy
+openai
