@@ -1,1 +1,1 @@
-web: gunicorn webhook:app
+web: gunicorn servidor_flask:app
