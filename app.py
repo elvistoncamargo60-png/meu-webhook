@@ -1,6 +1,6 @@
 from flask import Flask, request
 
-app = Flask(_name_)
+app = Flask(__name__)
 
 @app.route('/')
 def index():
@@ -12,5 +12,11 @@ def webhook():
     print("Recebido:", data)
     return "OK", 200
 
-if _name_ == '_main_':
+@app.route('/token-status')
+def token_status():
+    # Aqui você pode colocar a lógica para checar o token SendPulse
+    return "Token SendPulse ativo e válido!"
+
+if __name__ == '__main__':
     app.run()
+
