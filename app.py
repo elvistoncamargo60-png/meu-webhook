@@ -1,3 +1,5 @@
+
+import os
 from flask import Flask, request
 
 app = Flask(__name__)
@@ -18,5 +20,7 @@ def token_status():
     return "Token SendPulse ativo e válido!"
 
 if __name__ == '__main__':
-    app.run()
+    # Configura a aplicação para escutar na porta correta no Heroku
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
 
