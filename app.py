@@ -1,12 +1,19 @@
-
-import os
-from flask import Flask, request
+from flask import Flask, request, render_template_string
 
 app = Flask(__name__)
 
 @app.route('/')
 def index():
-    return "App funcionando!"
+    html_content = """
+    <html>
+        <head><title>App Flask</title></head>
+        <body>
+            <h1>App funcionando!</h1>
+            <p>Bem vindo à aplicação Flask rodando no Heroku.</p>
+        </body>
+    </html>
+    """
+    return render_template_string(html_content)
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
@@ -16,11 +23,4 @@ def webhook():
 
 @app.route('/token-status')
 def token_status():
-    # Aqui você pode colocar a lógica para checar o token SendPulse
     return "Token SendPulse ativo e válido!"
-
-if __name__ == '__main__':
-    # Configura a aplicação para escutar na porta correta no Heroku
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
-
