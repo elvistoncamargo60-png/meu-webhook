@@ -2,6 +2,7 @@ from flask import Flask, jsonify
 from auth_sendpulse import SendPulseAuth
 import requests
 from datetime import datetime
+import os  # Importar os para pegar variável de ambiente
 
 app = Flask(__name__)  # Cria a aplicação Flask
 
@@ -35,8 +36,8 @@ def token_status():
     last_renewal_datetime = datetime.fromtimestamp(last_renewal_timestamp).strftime('%Y-%m-%d %H:%M:%S')
     return jsonify({"last_renewal": last_renewal_datetime})
 
-# Roda local com debug
+# Correção para rodar no Heroku usando variável PORT dinâmica
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000, debug=True)
-
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
 
