@@ -1,0 +1,13 @@
+# Ignorar arquivos de sistema e temporários
+AppData/
+*.log
+*.tmp
+*.bak
+*.swp
+
+# Ignorar arquivos python compilados
+__pycache__/
+*.pyc
+
+# Ignorar arquivos de ambiente
+.env

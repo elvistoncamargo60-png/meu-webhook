@@ -1,20 +1,17 @@
 import requests
-import json # Importar a biblioteca json para formatar a saída
+import json  # Importar a biblioteca json para formatar a saída
 
 # ATENÇÃO: SUBSTITUA ESTES VALORES PELOS SEUS!
 # O token de acesso que você pegou no SendPulse.
-access_token = 'SEU_ACCESS_TOKEN_AQUI' 
+access_token = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImp0aSI6ImUwZmI4YzAxOTFmZTAxNDhjZjgwMjZlYTgwMmY1NmI0MTUzNDU3ZjNiNmQzZDIyMWJhNTMzYWRmYWQ2ZWJiYzllODFiZjQyOGEzOTliMjEwIn0.eyJhdWQiOiJiNGVkODMwNmQ4N2RiMWUwNWE0ZmUyMTYzZGRlZGU3ZSIsImp0aSI6ImUwZmI4YzAxOTFmZTAxNDhjZjgwMjZlYTgwMmIifQ...'  # Cole seu token aqui inteiro
 
 # ID do destinatário para o teste. Pode ser seu próprio ID em um chatbot do SendPulse.
-# Exemplo: Se for um chatbot do Facebook, é o ID do usuário do Messenger.
-# Você precisa obter este ID do painel do SendPulse, no histórico de conversas do seu chatbot.
-id_do_destinatario = 'ID_DO_DESTINATARIO_AQUI' 
+id_do_destinatario = 'COLE_AQUI_O_ID_DO_DESTINATARIO'
 
 # URL da API do SendPulse para enviar mensagens via chatbot.
 url_sendpulse = 'https://api.sendpulse.com/chatbot/send-message'
 
 # Dados da mensagem que vamos enviar.
-# Queremos que ela vá para o 'id_do_destinatario' e o texto será "Mensagem de teste via API SendPulse".
 payload_da_mensagem = {
     "recipient": {
         "id": id_do_destinatario
@@ -25,15 +22,14 @@ payload_da_mensagem = {
 }
 
 # Cabeçalhos necessários para a requisição.
-# Isso informa ao SendPulse que estamos autorizados e enviando dados JSON.
 headers_da_requisicao = {
-    'Authorization': f'Bearer {access_token}', # Seu token de acesso vai aqui
-    'Content-Type': 'application/json' # Informa que o conteúdo é JSON
+    'Authorization': f'Bearer {access_token}',
+    'Content-Type': 'application/json'
 }
 
 print("Tentando enviar mensagem para SendPulse...")
 print(f"URL: {url_sendpulse}")
-print(f"Payload: {json.dumps(payload_da_mensagem, indent=2)}") # Imprime o payload formatado para fácil leitura
+print(f"Payload: {json.dumps(payload_da_mensagem, indent=2)}")  # Imprime o payload formatado para fácil leitura
 
 try:
     # Faz a requisição POST para a API do SendPulse.
@@ -51,3 +47,4 @@ try:
 
 except requests.exceptions.RequestException as e:
     print(f"\nOcorreu um erro na requisição: {e}")
+
