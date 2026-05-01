@@ -1,4 +1,3 @@
-
 from flask import Flask, request, jsonify
 import os
 import requests
@@ -7,31 +6,23 @@ app = Flask(__name__)
 
 @app.route('/', methods=['GET'])
 def home():
-    return "Bot Link Shopee 2 - Webhook OK!"
+    return "Bot Link Shopee 2 OK!"
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
     data = request.json
-    if not data:
-        return jsonify({"error": "No data"}), 400
-    
     msg = data.get('message', '').lower()
     chat_id = data.get('chat_id')
-    
-    if 'oi' in msg or '/start' in msg:
-        response = "Oi! Digite 'ofertas' pra top Shopee!"
-    elif 'oferta' in msg:
-        response = "🔥 TOP Shopee: iPhone R$3999 [LINK] | Fone JBL R$199 [LINK] | TV R$1899 [LINK]"
+    if 'oi' in msg:
+        response = "Oi! Digite 'ofertas' pra Shopee!"
+    elif 'oferta' in msg or 'ofertas' in msg:
+        response = "🔥 TOP: iPhone R$3999 [LINK_AFILIADO] | Fone JBL R$199 [LINK] | TV R$1899 [LINK]"
     else:
-        response = "Digite 'ofertas' ou 'celular' pra links Shopee!"
-    
+        response = "Digite 'ofertas' ou 'celular'!"
     token = os.getenv('TELEGRAM_TOKEN')
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-    requests.post(url, json={"chat_id": chat_id, "text": response})
-    
-    print(f"Bot Shopee 2: {msg} -> {response}")
-    
-    return jsonify({"status": "OK"})
+    requests.post(f"https://api.telegram.org/bot{token}/sendMessage", json={"chat_id": chat_id, "text": response})
+    print(f"Webhook: {msg} -> {response}")
+    return jsonify({"status": "OK", "response": response})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
