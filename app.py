@@ -53,7 +53,6 @@ def scrape_shopee(query):
         soup = BeautifulSoup(r.text, 'html.parser')
        
         products = []
-        # Selector atualizado Shopee BR 2026 - classe comum
         items = soup.find_all('div', {'data-testid': 'shop-search-item-result'}) or soup.select('.shop-search-result-view__item')
         for item in items[:3]:
             name = item.select_one('.item-name, [data-test="item-name"]')
