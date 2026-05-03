@@ -7,74 +7,70 @@ import re
 app = Flask(__name__)
 
 SHOPEE_AFF_ID = "18345360599"
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 
-@app.route('/', methods=['GET'])
+@app.route("/", methods=["GET"])
 def home():
-    return "Bot Shopee Afiliados OK - Webhook pronto!"
+    return "AffiliateFlow AI v22 - Webhook OK!"
 
-@app.route('/webhook', methods=['POST'])
+@app.route("/webhook", methods=["POST"])
 def webhook():
     try:
-        data = request.json
-        message = data.get('message', '').lower().strip() if data else ''
-        chat_id = data.get('chat', {}).get('id') or data.get('chat_id')
-       
+        data = request.get_json()
+        message = data.get("message", "").lower()
+        chat_id = data.get("chat_id") or data.get("contact", {}).get("external_id")
+
         if not chat_id:
             return jsonify({"error": "No chat_id"}), 400
-   
-        if 'oi' in message or 'olá' in message:
-            response = "Oi! Digite 'ofertas', 'celular', 'fone' ou 'tv' pra Shopee afiliados!"
-        elif 'ofertas' in message or 'celular' in message:
-            response = scrape_shopee("celular")
-        elif 'fone' in message:
-            response = scrape_shopee("fone bluetooth")
-        elif 'tv' in message:
-            response = scrape_shopee("tv smart")
+
+        if "oi" in message or "ola" in message or "start" in message:
+            response = f"Oi! Digite 'ofertas' para ver produtos Shopee! 🔥🛒 ID: {SHOPEE_AFF_ID}"
+        elif "ofertas" in message:
+            products = scrape_shopee_offers()
+            response = "
+".join(products)
         else:
-            response = "Digite 'ofertas', 'celular', 'fone' ou 'tv' pra ver produtos Shopee!"
-       
-        token = os.getenv('TELEGRAM_TOKEN')
-        if token:
-            requests.post(f"https://api.telegram.org/bot{token}/sendMessage",
-                         json={"chat_id": chat_id, "text": response})
-            return jsonify({"status": "OK", "response": response})
-        else:
-            return jsonify({"error": "No TELEGRAM_TOKEN"}), 500
+            response = "Digite 'oi' ou 'ofertas' para começar! 🤖"
+
+        send_telegram_message(chat_id, response)
+        print(f"Webhook: {message} -> {response}")
+
+        return jsonify({"status": "OK", "response": response})
+
     except Exception as e:
+        print(f"Erro: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-def scrape_shopee(query):
+def scrape_shopee_offers():
+    url = "https://shopee.com.br/Celulares-Smartphones/cat.134"
+    headers = {"User-Agent": "Mozilla/5.0"}
     try:
-        url = f"https://shopee.com.br/search?keyword={query.replace(' ', '%20')}"
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        r = requests.get(url, headers=headers, timeout=10)
-        soup = BeautifulSoup(r.text, 'html.parser')
-       
+        resp = requests.get(url, headers=headers)
+        soup = BeautifulSoup(resp.text, "html.parser")
         products = []
-        items = soup.find_all('div', {'data-testid': 'shop-search-item-result'}) or soup.select('.shop-search-result-view__item')
-        for item in items[:3]:
-            name = item.select_one('.item-name, [data-test="item-name"]')
-            price = item.select_one('.price, .price-now')
-            link_a = item.select_one('a')
-            if name and price and link_a:
-                name_text = name.get_text(strip=True)[:60] + "..."
+        for item in soup.find_all("div", class_="shopee-search-item-result__item")[:3]:
+            name = item.find("div", class_="item-name")
+            price = item.find("span", class_="price")
+            link_elem = item.find("a", href=True)
+            if name and price and link_elem:
+                name_text = name.get_text(strip=True)[:50]
                 price_text = price.get_text(strip=True)
-                link = link_a.get('href', '')
-                if link.startswith('/'):
-                    link = "https://shopee.com.br" + link
-                aff_link = f"{link}?af_id={SHOPEE_AFF_ID}"
+                aff_link = f"https://shopee.com.br{link_elem['href']}?af_id={SHOPEE_AFF_ID}"
                 products.append(f"🔥 {name_text}
 💰 {price_text}
 🛒 {aff_link}")
-       
-        return "
-
-".join(products) or f"Nenhum {query} agora. Tente 'ofertas'!"
+        return products if products else ["Ofertas Shopee carregando... 🔥"]
     except:
-        return "Scraping temporariamente indisponível. Tente 'oi' pra menu!"
+        return ["Erro no scraping. Tente novamente! ⚠️"]
 
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+def send_telegram_message(chat_id, text):
+    if not TELEGRAM_TOKEN:
+        print("TELEGRAM_TOKEN não configurado")
+        return
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    data = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
+    requests.post(url, json=data)
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
