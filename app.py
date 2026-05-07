@@ -1,25 +1,27 @@
 from flask import Flask, request, jsonify
 import os
-import requests
 
 app = Flask(__name__)
 
-SHOPEE_AFF_ID = "18345360599"
-
-@app.route("/", methods=["GET"])
+@app.route('/', methods=['GET'])
 def home():
-    return "AffiliateFlow v22 OK!"
+    return "MeuWebhook OK!"
 
-@app.route("/webhook", methods=["POST"])
+@app.route('/webhook', methods=['POST'])
 def webhook():
-    data = request.get_json()
-    message = data.get("message", "").lower()
-    chat_id = data.get("chat_id")
-    response = "Oi! Ofertas Shopee ID " + SHOPEE_AFF_ID if "oi" in message else "Link: https://shopee.com.br?af_id=" + SHOPEE_AFF_ID
-    if chat_id and os.environ.get("TELEGRAM_TOKEN"):
-        requests.post("https://api.telegram.org/bot" + os.environ["TELEGRAM_TOKEN"] + "/sendMessage", json={"chat_id": chat_id, "text": response})
-    return jsonify({"status": "OK"})
+    data = request.json or {}
+    # Scraping Shopee placeholder - expande depois
+    produto = "Smartphone Samsung Galaxy"
+    preco = "R$899"
+    link = "https://shopee.com.br/produto?aff=18345360599"
+    
+    return jsonify({
+        "status": "OK",
+        "produto": produto,
+        "preco": preco,
+        "link": link
+    }), 200
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
