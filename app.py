@@ -14,12 +14,11 @@ def webhook():
     produto = "Smartphone Samsung Galaxy"
     preco = "R$899"
     link = "https://shopee.com.br/produto?aff=18345360599"
-    
+
     return jsonify({
-        "status": "OK",
-        "produto": produto,
-        "preco": preco,
-        "link": link
+        "response": f"Produto: {produto}
+Preço: {preco}
+Link afiliado: {link}"
     }), 200
 
 if __name__ == '__main__':
