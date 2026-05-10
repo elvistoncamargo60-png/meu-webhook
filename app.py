@@ -1,22 +1,11 @@
 from flask import Flask, request, jsonify
-import os
 
 app = Flask(__name__)
 
 @app.route('/', methods=['GET'])
 def home():
-    return "MeuWebhook OK!"
+    return "AffiliateFlow Webhook OK - Shopee Real!"
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    data = request.json or {}
-    # Scraping Shopee placeholder - expande depois
-    produto = "Smartphone Samsung Galaxy"
-    preco = "R$899"
-    link = "https://shopee.com.br/produto?aff=18345360599"
-
-    return jsonify({
-        "response": f"Produto: {produto}
-Preço: {preco}
-Link afiliado: {link}"
-    }), 200
+    data
