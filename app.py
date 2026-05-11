@@ -47,9 +47,8 @@ def process_scraping(query="whey protein"):
         # Gera vídeo MoviePy 10s + overlay
         video_path = f"/tmp/{uuid.uuid4()}.mp4"
         img_clip = ImageClip(img_path, duration=10)
-        txt_clip = (TextClip(f"Compre agora!
-{aff_link}", fontsize=40, color='white', bg_color='black')
-                    .set_position(('center', 'bottom')).set_duration(10))
+       txt_clip = TextClip(f"Compre agora!\
+{aff_link}", fontsize=40, color='white', bg_color='black').set_position(('center', 'bottom')).set_duration(10) 
         final_clip = CompositeVideoClip([img_clip, txt_clip])
         final_clip.write_videofile(video_path, fps=24, verbose=False, logger=None)
         
