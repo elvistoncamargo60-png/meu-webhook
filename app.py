@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import logging
 from threading import Thread
 from urllib.parse import quote, urljoin
@@ -99,9 +100,15 @@ def fetch_shopee_product(query):
     product_url = ""
     image_url = ""
 
-    m_title = re.search(r'"name"s*:s*"([^"]+)"', html)
-    if m_title:
-        title = m_title.group(1)
+    patterns = [
+        r'"name"s*:s*"([^"]+)"',
+        r'"title"s*:s*"([^"]+)"',
+    ]
+    for p in patterns:
+        m = re.search(p, html)
+        if m:
+            title = m.group(1)
+            break
 
     m_price = re.search(r'"price"s*:s*"?(d+(?:.d+)?)"?', html)
     if m_price:
@@ -111,9 +118,17 @@ def fetch_shopee_product(query):
     if m_url:
         product_url = m_url.group(1).replace("\\/", "/")
 
+    if not product_url:
+        m_url2 = re.search(r'"url"s*:s*"([^"]+/product[^"]+)"', html)
+        if m_url2:
+            product_url = m_url2.group(1).replace("\\/", "/")
+
     m_image = re.search(r'"image"s*:s*"([^"]+)"', html)
     if m_image:
         image_url = m_image.group(1).replace("\\/", "/")
+
+    if image_url and image_url.startswith("//"):
+        image_url = "https:" + image_url
 
     if product_url and product_url.startswith("/"):
         product_url = urljoin("https://shopee.com.br", product_url)
@@ -126,6 +141,7 @@ def fetch_shopee_product(query):
         "product_url": product_url,
         "image_url": image_url,
         "affiliate_link": affiliate_link,
+        "search_url": url,
     }
 
 
@@ -136,7 +152,7 @@ Preço: {price}
     img = ImageClip(image_path).set_duration(8).resize(width=720)
     text = TextClip(
         txt,
-        fontsize=36,
+        fontsize=34,
         color="white",
         bg_color="black",
         method="label",
@@ -157,35 +173,34 @@ def process_user_message(chat_id, text):
             query = "whey protein"
 
         product = fetch_shopee_product(query)
+        logging.info("Produto extraído: %s", json.dumps(product, ensure_ascii=False))
 
         image_path = "/tmp/shopee_image.jpg"
         video_path = "/tmp/shopee_video.mp4"
 
-        if product["image_url"]:
-            download_file(product["image_url"], image_path)
-            create_video_from_image(
-                image_path,
-                product["title"],
-                product["price"],
-                product["affiliate_link"],
-                video_path,
-            )
+        if not product["image_url"] or not product["affiliate_link"]:
+            msg = f"""Não consegui montar vídeo agora.
 
-            legenda = f"""ID {AFFILIATE_ID}
+<b>Título:</b> {product['title']}
+<b>Preço:</b> {product['price']}
+<b>Link:</b> {product['affiliate_link'] or 'não encontrado'}"""
+            send_telegram_message(chat_id, msg)
+            return
+
+        download_file(product["image_url"], image_path)
+        create_video_from_image(
+            image_path,
+            product["title"],
+            product["price"],
+            product["affiliate_link"],
+            video_path,
+        )
+
+        legenda = f"""ID {AFFILIATE_ID}
 {product['title']}
 {product['affiliate_link']}"""
 
-            send_telegram_video(chat_id, video_path, legenda)
-        else:
-            resposta = f"""Produto Shopee via IA encontrado!
-
-<b>Título:</b> {product['title']}
-
-<b>Preço:</b> {product['price']}
-
-<b>Link afiliado:</b> {product['affiliate_link']}"""
-
-            send_telegram_message(chat_id, resposta)
+        send_telegram_video(chat_id, video_path, legenda)
 
     except Exception as e:
         logging.exception("Erro no processamento")
