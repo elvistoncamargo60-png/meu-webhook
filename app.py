@@ -1,6 +1,5 @@
 import os
 import re
-import time
 import logging
 from threading import Thread
 from urllib.parse import quote
@@ -99,7 +98,7 @@ def fetch_shopee_product(query):
         "title": title,
         "product_url": product_url,
         "image_url": image_url,
-        "affiliate_link": affiliate_link
+        "affiliate_link": affiliate_link,
     }
 
 
