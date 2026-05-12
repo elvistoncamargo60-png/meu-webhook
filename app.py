@@ -112,21 +112,21 @@ def process_user_message(chat_id, text):
 
         product = fetch_shopee_product(query)
 
-        resposta = (
-            f"Produto Shopee via IA encontrado!
+       resposta = (
+    f"Produto Shopee via IA encontrado!
 
 "
-            f"<b>Título:</b> {product['title']}
+    f"<b>Título:</b> {product['title']}
 
 "
-            f"<b>Link afiliado:</b> {product['affiliate_link']}
+    f"<b>Link afiliado:</b> {product['affiliate_link']}
 
 "
-            "Acesse, veja o vídeo e compre direto no link abaixo.
+    "Acesse, veja o vídeo e compre direto no link abaixo.
 
 "
-            "Se quiser, você pode me mandar outro nome de produto."
-        )
+    "Se quiser, você pode me mandar outro nome de produto."
+) 
 
         send_telegram_message(chat_id, resposta)
 
