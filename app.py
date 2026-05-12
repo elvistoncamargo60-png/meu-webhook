@@ -5,23 +5,24 @@ import json
 from bs4 import BeautifulSoup
 import random
 
+
 app = Flask(__name__)
 
 # Seu token do bot do Telegram (vem das variáveis do Railway)
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "SEU_TOKEN_AQUI")
 API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
-# Seu link de afiliado (exemplo: base do Shopee com seu ID)
-# Exemplo falso: "https://shopee.com.br/affiliatelink/12345"
-# Você troca isso pelo seu link real
+# Seu link de afiliado base da Shopee
+# Substitua essa string pelo seu link real
 AFILIADO_BASE = "https://shopee.com.br/SEU_LINK_AQUI/"
+
 
 # --- FUNÇÃO QUE FAZ O SCRAPING DA SHOPEE (SIMPLIFICADO) ---
 def scrape_shopee(item_nome):
-    # NOME DA LOJA OU PALAVRA-CHAVE QUE VOCÊ QUER USAR
+    # Usa a palavra que você quiser
     keyword = item_nome.strip()
 
-    # URL de busca na Shopee (paginação básica, só o 1o resultado)
+    # URL de busca na Shopee
     url = f"https://shopee.com.br/search?keyword={keyword}"
 
     headers = {
@@ -35,23 +36,22 @@ def scrape_shopee(item_nome):
 
         soup = BeautifulSoup(resp.text, "html.parser")
 
-        # BUSCA PELO PRIMEIRO PRODUTO (link e nome)
+        # Tenta achar um produto na página
         produto = soup.find("a", class_="shopee-item-card")
         if not produto:
             return None, None
 
-        # TENTA PEGAR O LINK DO PRODUTO
+        # Tenta pegar o link
         link = produto.get("href", "")
 
-        # TENTA PEGAR O NOME
+        # Tenta pegar o nome
         titulo = produto.find("div", class_="item-title")
         if titulo:
             nome = titulo.text.strip()
         else:
-            # PEGAR POR OUTRO CAMPO COMUM
             nome = "Produto Shopee"
 
-        # MONTAR LINK COM SEU AFILIADO
+        # Monta o link com seu afiliado
         if link and link.startswith("https://"):
             link_final = AFILIADO_BASE + link.split("shopee.com.br")[-1]
         else:
@@ -68,7 +68,7 @@ def scrape_shopee(item_nome):
 @app.route("/webhook", methods=["POST"])
 def webhook():
     try:
-        # PEGAR O JSON QUE O TELEGRAM MANDA
+        # Pega o JSON que o Telegram manda
         data = request.json
         if not data or "message" not in data:
             return "ok", 200
@@ -77,18 +77,17 @@ def webhook():
         chat_id = msg["chat"]["id"]
         text = msg.get("text", "").strip()
 
-        # AQUI VOCÊ ESCOLHE O QUE FAZER QUANDO MANDA "oi"
+        # Quando o usuário manda "oi"
         if text.lower() == "oi":
-          resposta = "Oi! Iniciando scraping Shopee via IA. Aguarde..." 
+            # Mensagem inicial (uma única string completa, sem quebra)
+            resposta = "Oi! Iniciando scraping Shopee via IA. Aguarde..."
 
-            # Chama a sua lógica de scraping e cria o link
-            # Exemplo: você pode usar outra palavra depois de "oi"
-            # Ex: "oi chinelo" -> chinelo = True
+            # Aqui você pode ajustar o que passar para o scraping
             nome_produto, link = scrape_shopee("Shopee via IA")
 
             if nome_produto and link:
                 resposta = (
-                    f"Produto encontrado na Shopee via IA!
+                    f"Produto Shopee via IA encontrado!
 
 "
                     f"**Título:** {nome_produto}
@@ -105,7 +104,7 @@ def webhook():
             else:
                 resposta = "Não consegui encontrar o produto agora. Tente novamente mais tarde."
 
-            # MANDA RESPOSTA DIRETO PARA O TELEGRAM (sem SendPulse)
+            # Envia resposta direto para o Telegram
             payload = {
                 "chat_id": chat_id,
                 "text": resposta,
@@ -116,7 +115,7 @@ def webhook():
             print("Resposta enviada:", resposta)
             return "ok", 200
 
-        # MANDA UM "ok" para qualquer outra mensagem
+        # Para qualquer outra mensagem
         return "ok", 200
 
     except Exception as e:
@@ -124,7 +123,7 @@ def webhook():
         return "ok", 200
 
 
-# --- ROTA DE TESTE (se quiser ver se o servidor está ligado) ---
+# --- ROTA DE TESTE ---
 @app.route("/")
 def index():
     return "Bot Shopee via IA no ar!"
