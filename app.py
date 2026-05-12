@@ -130,9 +130,9 @@ def fetch_shopee_product(query):
 
 
 def create_video_from_image(image_path, title, price, link, output_path):
-    txt = f"Produto: {title}
+    txt = f"""Produto: {title}
 Preço: {price}
-{link}"
+{link}"""
     img = ImageClip(image_path).set_duration(8).resize(width=720)
     text = TextClip(
         txt,
