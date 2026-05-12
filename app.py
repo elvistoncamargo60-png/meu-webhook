@@ -79,7 +79,7 @@ def webhook():
 
         # AQUI VOCÊ ESCOLHE O QUE FAZER QUANDO MANDA "oi"
         if text.lower() == "oi":
-            resposta = "Oi! Iniciando scraping Shopee via IA. Aguarde...
+           resposta = "Oi! Iniciando scraping Shopee via IA. Aguarde..." 
 
 Aguarde..."
 
