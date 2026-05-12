@@ -13,6 +13,7 @@ logging.basicConfig(level=logging.INFO)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 DEFAULT_CHAT_ID = os.getenv("CHAT_ID", "").strip()
 AFFILIATE_ID = os.getenv("AFFILIATE_ID", "18345360599").strip()
+
 SHOPEE_SEARCH_URL = "https://shopee.com.br/search?keyword={query}"
 TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
@@ -31,20 +32,17 @@ def build_affiliate_link(url):
         return ""
     if "affiliateId=" in url:
         return url
-    sep = "&" if "?" in url else "?"
-    return f"{url}{sep}affiliateId={AFFILIATE_ID}"
-
-
-def safe_telegram_text(text):
-    return clean_text(text)
+    separator = "&" if "?" in url else "?"
+    return f"{url}{separator}affiliateId={AFFILIATE_ID}"
 
 
 def send_telegram_message(chat_id, text):
     if not TELEGRAM_BOT_TOKEN or not chat_id:
         return None
+
     payload = {
         "chat_id": chat_id,
-        "text": safe_telegram_text(text),
+        "text": text,
         "parse_mode": "HTML",
         "disable_web_page_preview": False,
     }
@@ -54,10 +52,11 @@ def send_telegram_message(chat_id, text):
 def send_telegram_video(chat_id, video_url, caption=""):
     if not TELEGRAM_BOT_TOKEN or not chat_id or not video_url:
         return None
+
     payload = {
         "chat_id": chat_id,
         "video": video_url,
-        "caption": safe_telegram_text(caption)[:1024],
+        "caption": caption[:1024],
         "supports_streaming": True,
     }
     return requests.post(f"{TELEGRAM_API}/sendVideo", json=payload, timeout=30)
@@ -67,11 +66,16 @@ def fetch_shopee_product(query):
     q = quote(clean_text(query))
     search_url = SHOPEE_SEARCH_URL.format(query=q)
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0 Safari/537.36"
+        )
     }
-    r = requests.get(search_url, headers=headers, timeout=20)
-    r.raise_for_status()
-    html = r.text
+
+    response = requests.get(search_url, headers=headers, timeout=20)
+    response.raise_for_status()
+    html = response.text
 
     title = "Produto Shopee"
     product_url = ""
@@ -112,21 +116,21 @@ def process_user_message(chat_id, text):
 
         product = fetch_shopee_product(query)
 
-       resposta = (
-    f"Produto Shopee via IA encontrado!
+        resposta = (
+            f"Produto Shopee via IA encontrado!
 
 "
-    f"<b>Título:</b> {product['title']}
+            f"<b>Título:</b> {product['title']}
 
 "
-    f"<b>Link afiliado:</b> {product['affiliate_link']}
+            f"<b>Link afiliado:</b> {product['affiliate_link']}
 
 "
-    "Acesse, veja o vídeo e compre direto no link abaixo.
+            "Acesse, veja o vídeo e compre direto no link abaixo.
 
 "
-    "Se quiser, você pode me mandar outro nome de produto."
-) 
+            "Se quiser, você pode me mandar outro nome de produto."
+        )
 
         send_telegram_message(chat_id, resposta)
 
