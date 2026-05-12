@@ -1,14 +1,12 @@
 import os
 import re
 import json
-import time
 import logging
 from threading import Thread
 from urllib.parse import quote, urljoin
 
 import requests
 from flask import Flask, request, jsonify
-from moviepy.editor import ImageClip, TextClip, CompositeVideoClip
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -48,7 +46,9 @@ def send_telegram_message(chat_id, text):
         "parse_mode": "HTML",
         "disable_web_page_preview": False,
     }
-    return requests.post(f"{TELEGRAM_API}/sendMessage", json=payload, timeout=20)
+    r = requests.post(f"{TELEGRAM_API}/sendMessage", json=payload, timeout=20)
+    logging.info("sendMessage status=%s body=%s", r.status_code, r.text)
+    return r
 
 
 def send_telegram_video(chat_id, video_path, caption=""):
@@ -62,7 +62,9 @@ def send_telegram_video(chat_id, video_path, caption=""):
             "supports_streaming": True,
             "parse_mode": "HTML",
         }
-        return requests.post(f"{TELEGRAM_API}/sendVideo", data=data, files=files, timeout=120)
+        r = requests.post(f"{TELEGRAM_API}/sendVideo", data=data, files=files, timeout=120)
+        logging.info("sendVideo status=%s body=%s", r.status_code, r.text)
+        return r
 
 
 def download_file(url, dest_path):
@@ -101,11 +103,7 @@ def fetch_shopee_product(query):
     product_url = ""
     image_url = ""
 
-    patterns = [
-        r'"name"s*:s*"([^"]+)"',
-        r'"title"s*:s*"([^"]+)"',
-    ]
-    for p in patterns:
+    for p in [r'"name"s*:s*"([^"]+)"', r'"title"s*:s*"([^"]+)"']:
         m = re.search(p, html)
         if m:
             title = m.group(1)
@@ -128,10 +126,10 @@ def fetch_shopee_product(query):
     if m_image:
         image_url = m_image.group(1).replace("\\/", "/")
 
-    if image_url and image_url.startswith("//"):
+    if image_url.startswith("//"):
         image_url = "https:" + image_url
 
-    if product_url and product_url.startswith("/"):
+    if product_url.startswith("/"):
         product_url = urljoin("https://shopee.com.br", product_url)
 
     affiliate_link = build_affiliate_link(product_url)
@@ -146,38 +144,17 @@ def fetch_shopee_product(query):
     }
 
 
-def create_video_from_image(image_path, title, price, link, output_path):
-    txt = f"""Produto: {title}
-Preço: {price}
-{link}"""
-    img = ImageClip(image_path).set_duration(8).resize(width=720)
-    text = TextClip(
-        txt,
-        fontsize=34,
-        color="white",
-        bg_color="black",
-        method="label",
-        size=(680, None),
-    ).set_position(("center", "bottom")).set_duration(8)
-
-    video = CompositeVideoClip([img.set_position("center"), text])
-    video.write_videofile(output_path, fps=24, codec="libx264", audio=False, verbose=False, logger=None)
-    return output_path
-
-
-def process_user_message(chat_id, text):
+def handle_message(chat_id, text):
     try:
-        send_telegram_message(chat_id, "Oi! Iniciando scraping Shopee via IA. Aguarde...")
+        logging.info("chat_id=%s text=%s", chat_id, text)
+        send_telegram_message(chat_id, "Recebi sua mensagem no Railway. Processando...")
 
         query = clean_text(text)
         if query.lower() in ["oi", "olá", "ola", "start", "/start"]:
             query = "whey protein"
 
         product = fetch_shopee_product(query)
-        logging.info("Produto extraído: %s", json.dumps(product, ensure_ascii=False))
-
-        image_path = "/tmp/shopee_image.jpg"
-        video_path = "/tmp/shopee_video.mp4"
+        logging.info("produto=%s", json.dumps(product, ensure_ascii=False))
 
         if not product["image_url"] or not product["affiliate_link"]:
             msg = f"""Não consegui montar vídeo agora.
@@ -188,14 +165,29 @@ def process_user_message(chat_id, text):
             send_telegram_message(chat_id, msg)
             return
 
+        image_path = "/tmp/shopee_image.jpg"
+        video_path = "/tmp/shopee_video.mp4"
+
         download_file(product["image_url"], image_path)
-        create_video_from_image(
-            image_path,
-            product["title"],
-            product["price"],
-            product["affiliate_link"],
-            video_path,
-        )
+
+        from moviepy.editor import ImageClip, TextClip, CompositeVideoClip
+
+        txt = f"""Produto: {product['title']}
+Preço: {product['price']}
+{product['affiliate_link']}"""
+
+        img = ImageClip(image_path).set_duration(8).resize(width=720)
+        text = TextClip(
+            txt,
+            fontsize=34,
+            color="white",
+            bg_color="black",
+            method="label",
+            size=(680, None),
+        ).set_position(("center", "bottom")).set_duration(8)
+
+        video = CompositeVideoClip([img.set_position("center"), text])
+        video.write_videofile(video_path, fps=24, codec="libx264", audio=False, verbose=False, logger=None)
 
         legenda = f"""ID {AFFILIATE_ID}
 {product['title']}
@@ -211,18 +203,16 @@ def process_user_message(chat_id, text):
 @app.route("/webhook", methods=["POST"])
 def webhook():
     data = request.get_json(silent=True) or {}
-    logging.info("Update recebido: %s", data)
-
+    logging.info("update=%s", json.dumps(data, ensure_ascii=False))
     message = data.get("message") or data.get("edited_message") or {}
     chat = message.get("chat") or {}
     text = message.get("text") or ""
-
     chat_id = chat.get("id") or CHAT_ID
 
     if not chat_id:
         return jsonify({"ok": False, "error": "chat_id ausente"}), 200
 
-    Thread(target=process_user_message, args=(chat_id, text), daemon=True).start()
+    Thread(target=handle_message, args=(chat_id, text), daemon=True).start()
     return jsonify({"ok": True, "status": "received"}), 200
 
 
