@@ -1,135 +1,169 @@
 import os
-from flask import Flask, request
-import requests
-import json
-from bs4 import BeautifulSoup
-import random
+import re
+import time
+import logging
+from threading import Thread
+from urllib.parse import quote
 
+import requests
+from flask import Flask, request, jsonify
 
 app = Flask(__name__)
+logging.basicConfig(level=logging.INFO)
 
-# Seu token do bot do Telegram (vem das variáveis do Railway)
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "SEU_TOKEN_AQUI")
-API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
-
-# Seu link de afiliado base da Shopee
-# Substitua essa string pelo seu link real
-AFILIADO_BASE = "https://shopee.com.br/SEU_LINK_AQUI/"
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+DEFAULT_CHAT_ID = os.getenv("CHAT_ID", "").strip()
+AFFILIATE_ID = os.getenv("AFFILIATE_ID", "18345360599").strip()
+SHOPEE_SEARCH_URL = "https://shopee.com.br/search?keyword={query}"
+TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
 
-# --- FUNÇÃO QUE FAZ O SCRAPING DA SHOPEE (SIMPLIFICADO) ---
-def scrape_shopee(item_nome):
-    # Usa a palavra que você quiser
-    keyword = item_nome.strip()
+@app.route("/", methods=["GET"])
+def home():
+    return "AffiliateFlow AI v25 - OK", 200
 
-    # URL de busca na Shopee
-    url = f"https://shopee.com.br/search?keyword={keyword}"
 
+def clean_text(value):
+    return re.sub(r"s+", " ", str(value or "")).strip()
+
+
+def build_affiliate_link(url):
+    if not url:
+        return ""
+    if "affiliateId=" in url:
+        return url
+    sep = "&" if "?" in url else "?"
+    return f"{url}{sep}affiliateId={AFFILIATE_ID}"
+
+
+def safe_telegram_text(text):
+    return clean_text(text)
+
+
+def send_telegram_message(chat_id, text):
+    if not TELEGRAM_BOT_TOKEN or not chat_id:
+        return None
+    payload = {
+        "chat_id": chat_id,
+        "text": safe_telegram_text(text),
+        "parse_mode": "HTML",
+        "disable_web_page_preview": False,
+    }
+    return requests.post(f"{TELEGRAM_API}/sendMessage", json=payload, timeout=20)
+
+
+def send_telegram_video(chat_id, video_url, caption=""):
+    if not TELEGRAM_BOT_TOKEN or not chat_id or not video_url:
+        return None
+    payload = {
+        "chat_id": chat_id,
+        "video": video_url,
+        "caption": safe_telegram_text(caption)[:1024],
+        "supports_streaming": True,
+    }
+    return requests.post(f"{TELEGRAM_API}/sendVideo", json=payload, timeout=30)
+
+
+def fetch_shopee_product(query):
+    q = quote(clean_text(query))
+    search_url = SHOPEE_SEARCH_URL.format(query=q)
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+    }
+    r = requests.get(search_url, headers=headers, timeout=20)
+    r.raise_for_status()
+    html = r.text
+
+    title = "Produto Shopee"
+    product_url = ""
+    image_url = ""
+
+    m_title = re.search(r'"name"s*:s*"([^"]+)"', html)
+    if m_title:
+        title = m_title.group(1)
+
+    m_url = re.search(r'"product"[^}]*"url"s*:s*"([^"]+)"', html)
+    if m_url:
+        product_url = m_url.group(1).replace("\\/", "/")
+
+    m_image = re.search(r'"image"s*:s*"([^"]+)"', html)
+    if m_image:
+        image_url = m_image.group(1).replace("\\/", "/")
+
+    if product_url and product_url.startswith("/"):
+        product_url = "https://shopee.com.br" + product_url
+
+    affiliate_link = build_affiliate_link(product_url)
+
+    return {
+        "title": title,
+        "product_url": product_url,
+        "image_url": image_url,
+        "affiliate_link": affiliate_link
     }
 
+
+def process_user_message(chat_id, text):
     try:
-        resp = requests.get(url, headers=headers, timeout=10)
-        if resp.status_code != 200:
-            return None, None
+        send_telegram_message(chat_id, "Oi! Iniciando scraping Shopee via IA. Aguarde...")
 
-        soup = BeautifulSoup(resp.text, "html.parser")
+        query = clean_text(text)
+        if query.lower() in ["oi", "olá", "ola", "start", "/start"]:
+            query = "whey protein"
 
-        # Tenta achar um produto na página
-        produto = soup.find("a", class_="shopee-item-card")
-        if not produto:
-            return None, None
+        product = fetch_shopee_product(query)
 
-        # Tenta pegar o link
-        link = produto.get("href", "")
+        resposta = (
+            f"Produto Shopee via IA encontrado!
 
-        # Tenta pegar o nome
-        titulo = produto.find("div", class_="item-title")
-        if titulo:
-            nome = titulo.text.strip()
-        else:
-            nome = "Produto Shopee"
+"
+            f"<b>Título:</b> {product['title']}
 
-        # Monta o link com seu afiliado
-        if link and link.startswith("https://"):
-            link_final = AFILIADO_BASE + link.split("shopee.com.br")[-1]
-        else:
-            link_final = f"{AFILIADO_BASE}?q={keyword}"
+"
+            f"<b>Link afiliado:</b> {product['affiliate_link']}
 
-        return nome, link_final
+"
+            "Acesse, veja o vídeo e compre direto no link abaixo.
+
+"
+            "Se quiser, você pode me mandar outro nome de produto."
+        )
+
+        send_telegram_message(chat_id, resposta)
+
+        if product["image_url"]:
+            video_caption = (
+                f"ID {AFFILIATE_ID}
+"
+                f"{product['title']}
+"
+                f"{product['affiliate_link']}"
+            )
+            send_telegram_video(chat_id, product["image_url"], video_caption)
 
     except Exception as e:
-        print("Erro scraping Shopee:", e)
-        return None, None
+        logging.exception("Erro no processamento")
+        send_telegram_message(chat_id, f"Erro ao processar a solicitação: {e}")
 
 
-# --- ROTA DO WEBHOOK DO TELEGRAM ---
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    try:
-        # Pega o JSON que o Telegram manda
-        data = request.json
-        if not data or "message" not in data:
-            return "ok", 200
+    data = request.get_json(silent=True) or {}
+    logging.info("Update recebido: %s", data)
 
-        msg = data["message"]
-        chat_id = msg["chat"]["id"]
-        text = msg.get("text", "").strip()
+    message = data.get("message") or data.get("edited_message") or {}
+    chat = message.get("chat") or {}
+    text = message.get("text") or ""
 
-        # Quando o usuário manda "oi"
-        if text.lower() == "oi":
-            # Mensagem inicial (uma única string completa, sem quebra)
-            resposta = "Oi! Iniciando scraping Shopee via IA. Aguarde..."
+    chat_id = chat.get("id") or DEFAULT_CHAT_ID
 
-            # Aqui você pode ajustar o que passar para o scraping
-            nome_produto, link = scrape_shopee("Shopee via IA")
+    if not chat_id:
+        return jsonify({"ok": False, "error": "chat_id ausente"}), 200
 
-            if nome_produto and link:
-                resposta = (
-                    f"Produto Shopee via IA encontrado!
-
-"
-                    f"**Título:** {nome_produto}
-
-"
-                    f"**Link afiliado:** {link}
-
-"
-                    "Acesse, veja o vídeo e compre direto no link abaixo.
-
-"
-                    "Se quiser, você pode me mandar outro nome de produto."
-                )
-            else:
-                resposta = "Não consegui encontrar o produto agora. Tente novamente mais tarde."
-
-            # Envia resposta direto para o Telegram
-            payload = {
-                "chat_id": chat_id,
-                "text": resposta,
-                "parse_mode": "Markdown"
-            }
-            r = requests.post(f"{API_URL}/sendMessage", json=payload)
-
-            print("Resposta enviada:", resposta)
-            return "ok", 200
-
-        # Para qualquer outra mensagem
-        return "ok", 200
-
-    except Exception as e:
-        print("Erro no webhook:", e)
-        return "ok", 200
+    Thread(target=process_user_message, args=(chat_id, text), daemon=True).start()
+    return jsonify({"ok": True, "status": "received"}), 200
 
 
-# --- ROTA DE TESTE ---
-@app.route("/")
-def index():
-    return "Bot Shopee via IA no ar!"
-
-
-# Roda o servidor (Railway usa isso)
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8080))
+    port = int(os.getenv("PORT", "8080"))
     app.run(host="0.0.0.0", port=port)
