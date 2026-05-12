@@ -123,13 +123,14 @@ Acesse, veja o vídeo e compre direto no link abaixo.
 
 Se quiser, você pode me mandar outro nome de produto."""
 
+        legenda = f"""ID {AFFILIATE_ID}
+{product['title']}
+{product['affiliate_link']}"""
+
         send_telegram_message(chat_id, resposta)
 
         if product["image_url"]:
-            caption = f"ID {AFFILIATE_ID}
-{product['title']}
-{product['affiliate_link']}"
-            send_telegram_video(chat_id, product["image_url"], caption)
+            send_telegram_video(chat_id, product["image_url"], legenda)
 
     except Exception as e:
         logging.exception("Erro no processamento")
