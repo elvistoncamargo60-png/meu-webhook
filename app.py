@@ -2,10 +2,11 @@ import os
 import re
 import logging
 from threading import Thread
-from urllib.parse import quote
+from urllib.parse import quote, urljoin
 
 import requests
 from flask import Flask, request, jsonify
+from moviepy.editor import ImageClip, TextClip, CompositeVideoClip
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -48,16 +49,35 @@ def send_telegram_message(chat_id, text):
     return requests.post(f"{TELEGRAM_API}/sendMessage", json=payload, timeout=20)
 
 
-def send_telegram_video(chat_id, video_url, caption=""):
-    if not TELEGRAM_BOT_TOKEN or not chat_id or not video_url:
+def send_telegram_video(chat_id, video_path, caption=""):
+    if not TELEGRAM_BOT_TOKEN or not chat_id or not video_path:
         return None
-    payload = {
-        "chat_id": chat_id,
-        "video": video_url,
-        "caption": caption[:1024],
-        "supports_streaming": True,
+    with open(video_path, "rb") as f:
+        files = {"video": f}
+        data = {
+            "chat_id": chat_id,
+            "caption": caption[:1024],
+            "supports_streaming": True,
+            "parse_mode": "HTML",
+        }
+        return requests.post(f"{TELEGRAM_API}/sendVideo", data=data, files=files, timeout=120)
+
+
+def download_file(url, dest_path):
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0 Safari/537.36"
+        )
     }
-    return requests.post(f"{TELEGRAM_API}/sendVideo", json=payload, timeout=30)
+    r = requests.get(url, headers=headers, timeout=30, stream=True)
+    r.raise_for_status()
+    with open(dest_path, "wb") as f:
+        for chunk in r.iter_content(chunk_size=8192):
+            if chunk:
+                f.write(chunk)
+    return dest_path
 
 
 def fetch_shopee_product(query):
@@ -75,12 +95,17 @@ def fetch_shopee_product(query):
     html = r.text
 
     title = "Produto Shopee"
+    price = "Preço não encontrado"
     product_url = ""
     image_url = ""
 
     m_title = re.search(r'"name"s*:s*"([^"]+)"', html)
     if m_title:
         title = m_title.group(1)
+
+    m_price = re.search(r'"price"s*:s*"?(d+(?:.d+)?)"?', html)
+    if m_price:
+        price = m_price.group(1)
 
     m_url = re.search(r'"product"[^}]*"url"s*:s*"([^"]+)"', html)
     if m_url:
@@ -91,16 +116,36 @@ def fetch_shopee_product(query):
         image_url = m_image.group(1).replace("\\/", "/")
 
     if product_url and product_url.startswith("/"):
-        product_url = "https://shopee.com.br" + product_url
+        product_url = urljoin("https://shopee.com.br", product_url)
 
     affiliate_link = build_affiliate_link(product_url)
 
     return {
         "title": title,
+        "price": price,
         "product_url": product_url,
         "image_url": image_url,
         "affiliate_link": affiliate_link,
     }
+
+
+def create_video_from_image(image_path, title, price, link, output_path):
+    txt = f"Produto: {title}
+Preço: {price}
+{link}"
+    img = ImageClip(image_path).set_duration(8).resize(width=720)
+    text = TextClip(
+        txt,
+        fontsize=36,
+        color="white",
+        bg_color="black",
+        method="label",
+        size=(680, None),
+    ).set_position(("center", "bottom")).set_duration(8)
+
+    video = CompositeVideoClip([img.set_position("center"), text])
+    video.write_videofile(output_path, fps=24, codec="libx264", audio=False, verbose=False, logger=None)
+    return output_path
 
 
 def process_user_message(chat_id, text):
@@ -113,24 +158,34 @@ def process_user_message(chat_id, text):
 
         product = fetch_shopee_product(query)
 
-        resposta = f"""Produto Shopee via IA encontrado!
+        image_path = "/tmp/shopee_image.jpg"
+        video_path = "/tmp/shopee_video.mp4"
 
-<b>Título:</b> {product['title']}
+        if product["image_url"]:
+            download_file(product["image_url"], image_path)
+            create_video_from_image(
+                image_path,
+                product["title"],
+                product["price"],
+                product["affiliate_link"],
+                video_path,
+            )
 
-<b>Link afiliado:</b> {product['affiliate_link']}
-
-Acesse, veja o vídeo e compre direto no link abaixo.
-
-Se quiser, você pode me mandar outro nome de produto."""
-
-        legenda = f"""ID {AFFILIATE_ID}
+            legenda = f"""ID {AFFILIATE_ID}
 {product['title']}
 {product['affiliate_link']}"""
 
-        send_telegram_message(chat_id, resposta)
+            send_telegram_video(chat_id, video_path, legenda)
+        else:
+            resposta = f"""Produto Shopee via IA encontrado!
 
-        if product["image_url"]:
-            send_telegram_video(chat_id, product["image_url"], legenda)
+<b>Título:</b> {product['title']}
+
+<b>Preço:</b> {product['price']}
+
+<b>Link afiliado:</b> {product['affiliate_link']}"""
+
+            send_telegram_message(chat_id, resposta)
 
     except Exception as e:
         logging.exception("Erro no processamento")
