@@ -11,16 +11,16 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-DEFAULT_CHAT_ID = os.getenv("CHAT_ID", "").strip()
+CHAT_ID = os.getenv("CHAT_ID", "").strip()
 AFFILIATE_ID = os.getenv("AFFILIATE_ID", "18345360599").strip()
 
-SHOPEE_SEARCH_URL = "https://shopee.com.br/search?keyword={query}"
 TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
+SHOPEE_SEARCH_URL = "https://shopee.com.br/search?keyword={query}"
 
 
 @app.route("/", methods=["GET"])
 def home():
-    return "AffiliateFlow AI v25 - OK", 200
+    return "AffiliateFlow AI OK", 200
 
 
 def clean_text(value):
@@ -32,14 +32,13 @@ def build_affiliate_link(url):
         return ""
     if "affiliateId=" in url:
         return url
-    separator = "&" if "?" in url else "?"
-    return f"{url}{separator}affiliateId={AFFILIATE_ID}"
+    sep = "&" if "?" in url else "?"
+    return f"{url}{sep}affiliateId={AFFILIATE_ID}"
 
 
 def send_telegram_message(chat_id, text):
     if not TELEGRAM_BOT_TOKEN or not chat_id:
         return None
-
     payload = {
         "chat_id": chat_id,
         "text": text,
@@ -52,7 +51,6 @@ def send_telegram_message(chat_id, text):
 def send_telegram_video(chat_id, video_url, caption=""):
     if not TELEGRAM_BOT_TOKEN or not chat_id or not video_url:
         return None
-
     payload = {
         "chat_id": chat_id,
         "video": video_url,
@@ -64,7 +62,7 @@ def send_telegram_video(chat_id, video_url, caption=""):
 
 def fetch_shopee_product(query):
     q = quote(clean_text(query))
-    search_url = SHOPEE_SEARCH_URL.format(query=q)
+    url = SHOPEE_SEARCH_URL.format(query=q)
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -72,10 +70,9 @@ def fetch_shopee_product(query):
             "Chrome/124.0 Safari/537.36"
         )
     }
-
-    response = requests.get(search_url, headers=headers, timeout=20)
-    response.raise_for_status()
-    html = response.text
+    r = requests.get(url, headers=headers, timeout=20)
+    r.raise_for_status()
+    html = r.text
 
     title = "Produto Shopee"
     product_url = ""
@@ -116,33 +113,23 @@ def process_user_message(chat_id, text):
 
         product = fetch_shopee_product(query)
 
-        resposta = (
-            f"Produto Shopee via IA encontrado!
+        resposta = f"""Produto Shopee via IA encontrado!
 
-"
-            f"<b>Título:</b> {product['title']}
+<b>Título:</b> {product['title']}
 
-"
-            f"<b>Link afiliado:</b> {product['affiliate_link']}
+<b>Link afiliado:</b> {product['affiliate_link']}
 
-"
-            "Acesse, veja o vídeo e compre direto no link abaixo.
+Acesse, veja o vídeo e compre direto no link abaixo.
 
-"
-            "Se quiser, você pode me mandar outro nome de produto."
-        )
+Se quiser, você pode me mandar outro nome de produto."""
 
         send_telegram_message(chat_id, resposta)
 
         if product["image_url"]:
-            video_caption = (
-                f"ID {AFFILIATE_ID}
-"
-                f"{product['title']}
-"
-                f"{product['affiliate_link']}"
-            )
-            send_telegram_video(chat_id, product["image_url"], video_caption)
+            caption = f"ID {AFFILIATE_ID}
+{product['title']}
+{product['affiliate_link']}"
+            send_telegram_video(chat_id, product["image_url"], caption)
 
     except Exception as e:
         logging.exception("Erro no processamento")
@@ -158,7 +145,7 @@ def webhook():
     chat = message.get("chat") or {}
     text = message.get("text") or ""
 
-    chat_id = chat.get("id") or DEFAULT_CHAT_ID
+    chat_id = chat.get("id") or CHAT_ID
 
     if not chat_id:
         return jsonify({"ok": False, "error": "chat_id ausente"}), 200
