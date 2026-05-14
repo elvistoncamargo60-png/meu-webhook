@@ -4,27 +4,25 @@ from bs4 import BeautifulSoup
 from moviepy.editor import ImageClip, TextClip, CompositeVideoClip
 import logging
 import io
+import time
 
 app = Flask(__name__)
 BOT_TOKEN = "8762957424:AAEb-YUWZPO_oo9aXDiXAH-oXHeVPcRK8OQ"
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
-AFFILIATE_ID = "18345360599"
 
 logging.basicConfig(level=logging.INFO)
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
     update = request.get_json()
-    logging.info(f"update={update}")
-    
     if 'message' in update:
         chat_id = update['message']['chat']['id']
-        query = update['message'].get('text', '').strip() or "produto shopee"
+        query = update['message'].get('text', '').strip() or "tênis"
         
         def send_text(msg):
             requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": msg})
         
-        send_text("🔄 Gerando vídeo Shopee...")
+        send_text(f"🚀 Buscando 5 produtos '{query}' Shopee...")
         
         try:
             search_url = f"https://shopee.com.br/search?keyword={requests.utils.quote(query)}"
@@ -32,29 +30,34 @@ def webhook():
             resp = requests.get(search_url, headers=headers)
             soup = BeautifulSoup(resp.text, 'html.parser')
             
-            product_link = soup.find('a', {'data-testid': 'link-to-product-detail'})
-            img = product_link.find('img')['src'] if product_link else "https://via.placeholder.com/512x512?text=Shopee"
-            name = product_link.get('aria-label', 'Produto Shopee')[:50] if product_link else "Produto Shopee"
-            affiliate_link = f"https://shopee.sjv.io/c/18345360599?subId=bot&u={search_url}"
+            products = soup.find_all('a', {'data-testid': 'link-to-product-detail'})[:5]
             
-            img_resp = requests.get(img)
-            img_data = io.BytesIO(img_resp.content)
-            
-            img_clip = ImageClip(img_data, duration=5).resize((512,512))
-            txt = TextClip(f"{name}
-Clique: {affiliate_link}", fontsize=35, color='white', bg_color='black')
-            txt = txt.set_position(('center', 'bottom')).set_duration(5)
-            video = CompositeVideoClip([img_clip, txt])
-            video_path = '/tmp/video.mp4'
-            video.write_videofile(video_path, fps=24, verbose=False, logger=None)
-            
-            with open(video_path, 'rb') as vid:
-                requests.post(f"{TELEGRAM_API}/sendVideo",
-                             data={"chat_id": chat_id, "caption": f"{name}
+            for i, product in enumerate(products, 1):
+                img = product.find('img')['src']
+                name = product.get('aria-label', f'Produto {i}')[:50]
+                product_url = 'https://shopee.com.br' + product['href']
+                affiliate_link = f"https://shopee.sjv.io/c/18345360599?subId=bot&u={product_url}"
+                
+                img_resp = requests.get(img)
+                img_data = io.BytesIO(img_resp.content)
+                
+                img_clip = ImageClip(img_data, duration=5).resize((512,512))
+                txt = TextClip(f"{name}
+{affiliate_link}", fontsize=30, color='white', bg_color='black')
+                txt = txt.set_position(('center', 'bottom')).set_duration(5)
+                video = CompositeVideoClip([img_clip, txt])
+                video_path = f'/tmp/video{i}.mp4'
+                video.write_videofile(video_path, fps=24, verbose=False, logger=None)
+                
+                with open(video_path, 'rb') as vid:
+                    requests.post(f"{TELEGRAM_API}/sendVideo",
+                                 data={"chat_id": chat_id, "caption": f"{i}/5 - {name}
 {affiliate_link}"},
-                             files={"video": vid})
+                                 files={"video": vid})
+                
+                time.sleep(1)  # Rate limit Telegram
             
-            send_text("✅ Vídeo com link afiliado enviado!")
+            send_text("✅ 5 vídeos + links afiliados enviados!")
             
         except Exception as e:
             logging.error(str(e))
