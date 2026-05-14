@@ -1,10 +1,7 @@
 from flask import Flask, request, jsonify
 import requests
 from bs4 import BeautifulSoup
-from moviepy.editor import ImageClip, TextClip, CompositeVideoClip
 import logging
-import io
-import time
 
 app = Flask(__name__)
 BOT_TOKEN = "8762957424:AAEb-YUWZPO_oo9aXDiXAH-oXHeVPcRK8OQ"
@@ -15,6 +12,7 @@ logging.basicConfig(level=logging.INFO)
 @app.route('/webhook', methods=['POST'])
 def webhook():
     update = request.get_json()
+    logging.info(f"update={update}")
+    
     if 'message' in update:
-        chat_id = update['message']['chat']['id']
-        query
+        chat_id
