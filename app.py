@@ -9,10 +9,13 @@ TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 logging.basicConfig(level=logging.INFO)
 
+def send_text(chat_id, msg):
+    requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": msg})
+
 @app.route('/webhook', methods=['POST'])
 def webhook():
     update = request.get_json()
-    logging.info(f"update={update}")
+    logging.info(f"Recebido: {update}")
     
     if 'message' in update:
         chat_id
