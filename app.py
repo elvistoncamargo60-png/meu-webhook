@@ -17,12 +17,12 @@ def webhook():
     update = request.get_json()
     if 'message' in update:
         chat_id = update['message']['chat']['id']
-        query = update['message'].get('text', '').strip() or "tênis"
+        query = update['message'].get('text', '').strip() or "produto shopee"
         
         def send_text(msg):
             requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": msg})
         
-        send_text(f"🚀 Buscando 5 produtos '{query}' Shopee...")
+        send_text(f"🚀 5 produtos '{query}' Shopee...")
         
         try:
             search_url = f"https://shopee.com.br/search?keyword={requests.utils.quote(query)}"
@@ -30,12 +30,14 @@ def webhook():
             resp = requests.get(search_url, headers=headers)
             soup = BeautifulSoup(resp.text, 'html.parser')
             
-            products = soup.find_all('a', {'data-testid': 'link-to-product-detail'})[:5]
+            products = soup.find_all('a', class_='product-link')[:5]  # Seletor Shopee atual
             
             for i, product in enumerate(products, 1):
-                img = product.find('img')['src']
-                name = product.get('aria-label', f'Produto {i}')[:50]
-                product_url = 'https://shopee.com.br' + product['href']
+                img_tag = product.find('img')
+                img = img_tag['src'] if img_tag else "https://via.placeholder.com/512x512?text=Shopee"
+                name_tag = product.find('div', class_='product-name')
+                name = name_tag.text.strip()[:50] if name_tag else f"Produto {i}"
+                product_url = 'https://shopee.com.br' + product.get('href', '')
                 affiliate_link = f"https://shopee.sjv.io/c/18345360599?subId=bot&u={product_url}"
                 
                 img_resp = requests.get(img)
@@ -55,7 +57,7 @@ def webhook():
 {affiliate_link}"},
                                  files={"video": vid})
                 
-                time.sleep(1)  # Rate limit Telegram
+                time.sleep(2)
             
             send_text("✅ 5 vídeos + links afiliados enviados!")
             
